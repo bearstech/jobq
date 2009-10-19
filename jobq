@@ -36,7 +36,7 @@ list_jobs() {
 
 add_job() {
   set -e
-  mkdir -p $JOBPATH/$queue
+  mkdir -m 0700 -p $JOBPATH/$queue
   cd $JOBPATH/$queue
 
   # Hopefully this 'mv' is atomic, thus our joblist is lock-free
@@ -55,7 +55,7 @@ queue_runner() {
     # Fetch older job file
     job=`ls -1rt 2>/dev/null | head -n1`
 
-    if [ x"$job" != x ]; then
+    if [ -n "$job" ]; then
       cmd=`cat $job`         # content of job file, the commande to run
       job=`basename "$job"`  # job ID
       jobt=`stat -c%Y $job`  # job submission time
@@ -83,7 +83,8 @@ run_daemon() {
     cd $JOBPATH/$queue
 
     pidfile=.runner
-    if kill -0 `cat $pidfile 2>/dev/null` 2>/dev/null; then
+    pid=`cat $pidfile 2>/dev/null`
+    if kill -0 "$pid" 2>/dev/null; then
         # OK, queue runner is alive for this queue
         exit 0
     fi

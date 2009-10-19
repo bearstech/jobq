@@ -1,6 +1,7 @@
 jobq 0.2
 
 	* Fix 'cat: .runner: No such file or directory' error
+	* Basic security (creating queue dir as user-private)
 
 jobq 0.1
 

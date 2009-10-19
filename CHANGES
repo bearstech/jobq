@@ -1,3 +1,9 @@
+jobq 0.3
+
+	* Really trapping INT and HUP signals now
+	* Fix job command unquoting
+	* Fix indentation, gotta get used to 4 whitespaces
+
 jobq 0.2
 
 	* Fix 'cat: .runner: No such file or directory' error

@@ -1,0 +1,14 @@
+Source: jobq
+Section: admin
+Priority: optional
+Maintainer: Vincent Caron <vcaron@bearstech.com>
+Build-Depends: debhelper
+Homepage: http://forge.bearstech.com/trac/wiki/JobQueue
+
+Package: jobq
+Architecture: all
+Depends: bash (>= 3.2), ${shlibs:Depends}, ${misc:Depends}
+Description: Simple job queue
+ jobq handles any nimber of job queues, where jobs are run as soon
+ as possible, one at once per queue. Log job timings and output.
+ .

@@ -1,0 +1,132 @@
+#!/bin/sh
+
+# Simple job queue, run one process at once per queue and log timings and delays.
+#
+# A jobqueue is a simple list of files as $JOBPATH/<queue-name>/<job-id>
+# which content is a plain command to execute.
+
+# Copyright (C) 2009 Bearstech - http://bearstech.com/
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+JOBPATH=/tmp/jobq-$USER
+
+
+list_jobs() {
+  cd $JOBPATH/$queue 2>/dev/null || exit 0
+  echo "ID     Submission date      Command"
+  ls -1rt | \
+  while read job; do
+    jobt=`stat -c%y $job | cut -d. -f1`
+    printf "%5s %20s  " $job "$jobt"
+    cat $job
+  done 
+}
+
+add_job() {
+  set -e
+  mkdir -p $JOBPATH/$queue
+  cd $JOBPATH/$queue
+
+  # Hopefully this 'mv' is atomic, thus our joblist is lock-free
+  id=$$
+  echo "$*" >.$id && mv .$id $id
+
+  # Automatically start queue runner
+  cd - >/dev/null && exec $0 -q $queue -d
+}
+
+queue_runner() {
+#  trap ":" INT HUP
+  exec </dev/null 2>/dev/null >/dev/null
+
+  while true; do
+    # Fetch older job file
+    job=`ls -1rt 2>/dev/null | head -n1`
+
+    if [ x"$job" != x ]; then
+      cmd=`cat $job`         # content of job file, the commande to run
+      job=`basename "$job"`  # job ID
+      jobt=`stat -c%Y $job`  # job submission time
+      rm $job                # remove the job, it _will_ be run in a few lines
+
+      # Run job in a subshell, capture stdin+stderr, send to syslog
+      export jobt
+      (
+        t0=`date +%s`
+        late=$(( $t0 - $jobt ))
+        echo "starting (delay=$late sec): $cmd"
+        $cmd 2>&1
+        ret=$?
+        dt=$(( `date +%s` - $t0 ))
+        echo "done (exit=$ret, time=$dt sec)"
+      ) | logger -t "job[$job]"
+    else
+      # No job, re-scan the queue later
+      sleep 5
+    fi
+  done
+}
+
+run_daemon() {
+    cd $JOBPATH/$queue
+
+    pidfile=.runner
+    if kill -0 `cat $pidfile 2>/dev/null` 2>/dev/null; then
+        # OK, queue runner is alive for this queue
+        exit 0
+    fi
+    # No queue runner at all or some dead pid, cleanup
+    rm -f $pidfile
+
+    export queue pidfile
+    queue_runner &
+
+    pid=$!
+    echo $pid > $pidfile
+    echo "queue runner started for '$queue' (pid $pid)" | logger -t jobq
+}
+
+help() {
+    cat << EOF
+Usage:
+  List queue        : $0 [-q <queue>]
+  Submit job        : $0 [-q <queue>] command args ...
+  Start queue runner: $0 [-q <queue>] -d
+
+The default queue is called, er, 'default'. One 'queue runner' daemon is
+needed per queue, and is started automatically upon first job submission.
+EOF
+  exit 1
+}
+
+queue=default
+
+parse_opt=run
+while [ $parse_opt != "done"  ] ; do
+    case "$1" in
+        -d) run_daemon;;
+        -q) shift; queue="$1"; shift;;
+        -h) help;;
+        -*) echo "$0: unknown option $1, try -h for help" >&2; exit 2;;
+         *) parse_opt=done;;
+    esac
+done
+
+
+if [ $# -gt 0 ]; then
+    add_job $*
+else
+    list_jobs
+fi

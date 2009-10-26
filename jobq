@@ -59,25 +59,28 @@ queue_runner() {
     exec </dev/null 2>/dev/null >/dev/null
 
     while true; do
-        # Fetch older job file
-        job=`ls -1rt 2>/dev/null | head -n1`
+        # Fetch job list in time order, older is first
+        jobl=`ls -1rt 2>/dev/null`
+        job=`echo "$jobl" | head -n1`
 
         if [ -n "$job" ]; then
-            cmd=`cat $job`         # content of job file, the command to run
-            job=`basename "$job"`  # job ID
-            jobt=`stat -c%Y $job`  # job submission time
-            rm $job                # remove the job, it _will_ be run in a few lines
+            cmd=`cat $job`              # content of job file, the command to run
+            job=`basename "$job"`       # job ID
+            jobt=`stat -c%Y $job`       # job submission time
+            todo=`echo "$jobl" |wc -l`  # job queue size
+            rm $job                     # remove the job, it _will_ be run in a few lines
+            todo=$(( $todo - 1 ))
 
             # Run job in a subshell, capture stdin+stderr, send to syslog
-            export jobt
+            export jobt todo
             (
                 t0=`date +%s`
                 late=$(( $t0 - $jobt ))
-                echo "starting (delay=$late sec): $cmd"
+                echo "start (delay:$late sec, todo:$todo): $cmd"
                 eval $cmd 2>&1
                 ret=$?
                 dt=$(( `date +%s` - $t0 ))
-                echo "done (exit=$ret, time=$dt sec)"
+                echo "done (time:$dt sec, exit:$ret)"
             ) | logger -t "job[$job]"
         else
             # No job, re-scan the queue later

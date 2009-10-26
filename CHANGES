@@ -1,3 +1,8 @@
+jobq 0.5
+
+	* Better logging, easier to read
+    * Logging jobqueue size at each job start
+
 jobq 0.4
 
 	* Using $LOGNAME instead of $USER (not set in cron env)

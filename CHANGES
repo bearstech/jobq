@@ -1,3 +1,7 @@
+jobq 0.4
+
+	* Using $LOGNAME instead of $USER (not set in cron env)
+
 jobq 0.3
 
 	* Really trapping INT and HUP signals now

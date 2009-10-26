@@ -72,11 +72,13 @@ queue_runner() {
             todo=$(( $todo - 1 ))
 
             # Run job in a subshell, capture stdin+stderr, send to syslog
+            # FIXME: should support mail output like cron
             export jobt todo
             (
                 t0=`date +%s`
                 late=$(( $t0 - $jobt ))
-                echo "start (delay:$late sec, todo:$todo): $cmd"
+                echo -n "start (delay:$late sec, todo:$todo): "
+                echo "$cmd" | sed 's/\\\([^\]\)/\1/g'
                 eval $cmd 2>&1
                 ret=$?
                 dt=$(( `date +%s` - $t0 ))

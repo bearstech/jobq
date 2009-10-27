@@ -1,7 +1,7 @@
 jobq 0.5
 
 	* Better logging, easier to read
-    * Logging jobqueue size at each job start
+	* Logging jobqueue size at each job start
 
 jobq 0.4
 

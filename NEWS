@@ -4,7 +4,13 @@ jobq 0.6
     * Added -v|--version
     * Documented options in help
     * Tidying queue listing (un-quoting command as in queue runner logger)
-    * (TODO) Added mail output a la cron
+    * Added mail output a la cron (requires mailx)
+    * Fixed todo=-1 info when queue was empty
+    * Added (undocumented) -x debug option (don't detach daemon from tty)
+    * Fixed a race condition in list_jobs where a job spec could be removed
+      after being listed
+    * Parse all options before calling run_daemon
+    * Better logging: displaying user/queue/jobid instead of only jobid
 
 jobq 0.5
 

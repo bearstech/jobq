@@ -1,2 +1,3 @@
-* Job deletion
-* Queue runner stop
+* Job cancelation
+* Queue runner list/stop
+* Interrupt idle 'sleep 5' to chain jobs immediatly

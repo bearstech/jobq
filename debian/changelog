@@ -1,8 +1,8 @@
-jobq (0.5-1) stable; urgency=low
+jobq (0.6) stable; urgency=low
 
   * Upstream update.
 
- -- Vincent CARON <vcaron@bearstech.com>  Mon, 26 Oct 2009 15:48:09 +0100
+ -- Vincent CARON <vcaron@bearstech.com>  Thu, 29 Oct 2009 18:05:10 +0100
 
 jobq (0.5) stable; urgency=low
 

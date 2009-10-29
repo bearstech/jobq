@@ -21,7 +21,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGRAM=jobq
-VERSION=0.6-dev
+VERSION=0.6
 
 # Hardcoded value for now, should fit most people
 JOBPATH=/tmp/$PROGRAM-$LOGNAME

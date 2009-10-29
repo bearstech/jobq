@@ -1,3 +1,4 @@
 * Job cancelation
 * Queue runner list/stop
 * Interrupt idle 'sleep 5' to chain jobs immediatly
+* Man page (--help gets bulky, and DFSG requires it)

@@ -2,7 +2,7 @@ default:
 	@echo Targets are: release, deb, debclean and debupload.
 
 release:
-	release=jobq-`head -n1 NEWS |awk '{print $$2}'`; \
+	release=jobq-`./jobq -v |awk '{print $$2}'`; \
 	mkdir -p $$release && ( \
 	  cp jobq COPYING README TODO NEWS $$release; \
 	  tar czf $$release.tar.gz $$release; \

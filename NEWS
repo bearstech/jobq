@@ -1,23 +1,31 @@
+jobq 0.6
+
+    * Added long options
+    * Added -v|--version
+    * Documented options in help
+    * Tidying queue listing (un-quoting command as in queue runner logger)
+    * (TODO) Added mail output a la cron
+
 jobq 0.5
 
-	* Better logging, easier to read
-	* Logging jobqueue size at each job start
+    * Better logging, easier to read
+    * Logging jobqueue size at each job start
 
 jobq 0.4
 
-	* Using $LOGNAME instead of $USER (not set in cron env)
+    * Using $LOGNAME instead of $USER (not set in cron env)
 
 jobq 0.3
 
-	* Really trapping INT and HUP signals now
-	* Fix job command unquoting
-	* Fix indentation, gotta get used to 4 whitespaces
+    * Really trapping INT and HUP signals now
+    * Fix job command unquoting
+    * Fix indentation, gotta get used to 4 whitespaces
 
 jobq 0.2
 
-	* Fix 'cat: .runner: No such file or directory' error
-	* Basic security (creating queue dir as user-private)
+    * Fix 'cat: .runner: No such file or directory' error
+    * Basic security (creating queue dir as user-private)
 
 jobq 0.1
 
-	* Initial release
+    * Initial release

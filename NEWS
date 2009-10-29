@@ -1,3 +1,7 @@
+jobq 0.7 (unreleased)
+
+    * Changed indent from 4ws to 2ws (I'm too used to id)
+
 jobq 0.6
 
     * Added long options

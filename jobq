@@ -21,108 +21,110 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGRAM=jobq
-VERSION=0.6
+VERSION=0.7-dev
 
 # Hardcoded value for now, should fit most people
 JOBPATH=/tmp/$PROGRAM-$LOGNAME
 
 
 list_jobs() {
-    cd $JOBPATH/$queue 2>/dev/null || exit 0
-    echo "ID     Submission date      Command"
-    ls -1rt | \
-    while read job; do
-        jobt=`stat -c%y $job 2>/dev/null | cut -d. -f1`
-        jobp=`sed 's/\\\([^\]\)/\1/g' $job 2>/dev/null`
-        if [ -n "$jobp" ]; then
-            printf "%5s %20s  %s" $job "$jobt" "$jobp"
-        fi
-    done 
+  cd $JOBPATH/$queue 2>/dev/null || exit 0
+  echo "ID     Submission date      Command"
+  ls -1rt | \
+  while read job; do
+    jobt=`stat -c%y $job 2>/dev/null | cut -d. -f1`
+    jobp=`sed 's/\\\([^\]\)/\1/g' $job 2>/dev/null`
+    if [ -n "$jobp" ]; then
+      printf "%5s %20s  %s" $job "$jobt" "$jobp"
+    fi
+  done 
 }
 
 add_job() {
-    set -e
-    mkdir -m 0700 -p $JOBPATH/$queue
-    cd $JOBPATH/$queue
+  set -e
+  mkdir -m 0700 -p $JOBPATH/$queue
+  cd $JOBPATH/$queue
 
-    # Command line args re-quote - you don't want to know this shell ugliness.
-    argv=
-    for a in "$@"; do 
-        qa=$(printf %q "$a")
-        argv="$argv$qa "
-    done
+  # Command line args re-quote - you don't want to know this shell ugliness.
+  argv=
+  for a in "$@"; do 
+    qa=$(printf %q "$a")
+    argv="$argv$qa "
+  done
 
-    # Hopefully this 'mv' is atomic, thus our joblist is lock-free
-    id=$$
-    echo "$argv" >.$id && mv .$id $id
+  # Hopefully this 'mv' is atomic, thus our joblist is lock-free
+  id=$$
+  echo "$argv" >.$id && mv .$id $id
   
-    # Automatically start queue runner
-    cd - >/dev/null && exec $0 -q $queue -d $debug
+  # Automatically start queue runner
+  cd - >/dev/null && exec $0 -q $queue -d $debug
 }
 
 queue_runner() {
-    if [ -z "$debug" ]; then
-        trap ":" INT HUP
-        exec </dev/null 2>/dev/null >/dev/null
-    fi
+  if [ -z "$debug" ]; then
+    trap ":" INT HUP
+    exec </dev/null 2>/dev/null >/dev/null
+  fi
 
-    while true; do
-        # Fetch job list in time order, older is first
-        jobl=`ls -1rt 2>/dev/null`
-        job=`echo "$jobl" | head -n1`
+  while true; do
+    # Fetch job list in time order, older is first
+    jobl=`ls -1rt 2>/dev/null`
+    job=`echo "$jobl" | head -n1`
 
-        if [ -n "$job" ]; then
-            cmd=`cat $job`              # content of job file, the command to run
-            job=`basename "$job"`       # job ID
-            jobt=`stat -c%Y $job`       # job submission time
-            rm $job                     # remove the job, it _will_ be run in a few lines
-            todo=`echo "$jobl" |wc -l`  # new job queue size
+    if [ -n "$job" ]; then
+      cmd=`cat $job`              # content of job file, the command to run
+      job=`basename "$job"`       # job ID
+      jobt=`stat -c%Y $job`       # job submission time
+      rm $job                     # remove the job, it _will_ be run in a few lines
+      todo=`echo "$jobl" |wc -l`  # new job queue size
 
-            # Run job in a subshell, capture stdin+stderr, send to syslog
-            export cmd jobt todo
-            (
-                t0=`date +%s`
-                late=$(( $t0 - $jobt ))
-                jobp=$(echo "$cmd" | sed 's/\\\([^\]\)/\1/g')
-                echo "start (delay:$late sec, todo:$todo): $jobp"
-                if [ -z "$MAILTO" ]; then
-                    eval $cmd 2>&1
-                else
-                    eval $cmd 2>&1 | mailx -E -s "`hostame -f` job[$LOGNAME/$queue/$job]: $jobp" $MAILTO
-                fi
-                ret=$?
-                dt=$(( `date +%s` - $t0 ))
-                echo "done (time:$dt sec, exit:$ret)"
-            ) | logger -t "job[$LOGNAME/$queue/$job]"
+      # Run job in a subshell, capture stdin+stderr, send to syslog
+      export cmd jobt todo
+      (
+        t0=`date +%s`
+        late=$(( $t0 - $jobt ))
+        jobp=$(echo "$cmd" | sed 's/\\\([^\]\)/\1/g')
+        echo "start (delay:$late sec, todo:$todo): $jobp"
+
+        if [ -z "$MAILTO" ]; then
+          eval $cmd 2>&1
         else
-            # No job, re-scan the queue later
-            sleep 5
+          eval $cmd 2>&1 | mailx -E -s "`hostame -f` job[$LOGNAME/$queue/$job]: $jobp" $MAILTO
         fi
-    done
+        ret=$?
+
+        dt=$(( `date +%s` - $t0 ))
+        echo "done (time:$dt sec, exit:$ret)"
+      ) | logger -t "job[$LOGNAME/$queue/$job]"
+    else
+      # No job, re-scan the queue later
+      sleep 5
+    fi
+  done
 }
 
 run_daemon() {
-    cd $JOBPATH/$queue
+  cd $JOBPATH/$queue
 
-    pidfile=.runner
-    pid=`cat $pidfile 2>/dev/null`
-    if kill -0 "$pid" 2>/dev/null; then
-        # OK, queue runner is alive for this queue
-        exit 0
-    fi
-    # No queue runner at all or some dead pid, cleanup
-    rm -f $pidfile
+  pidfile=.runner
+  pid=`cat $pidfile 2>/dev/null`
+  if kill -0 "$pid" 2>/dev/null; then
+    # OK, queue runner is alive for this queue
+    exit 0
+  fi
+  # No queue runner at all or some dead pid, cleanup
+  rm -f $pidfile
 
-    export debug queue pidfile
-    queue_runner &
+  export debug queue pidfile
+  queue_runner &
 
-    pid=$!
-    echo $pid > $pidfile
-    echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $pid)" | logger -t $PROGRAM
+  pid=$!
+  echo $pid > $pidfile
+  echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $pid)" | logger -t $PROGRAM
 }
 
 help() {
-    cat << EOF
+  cat << EOF
 List queue: $PROGRAM [-q <queue>]
 Submit job: $PROGRAM [-q <queue>] command args ...
 
@@ -141,12 +143,12 @@ Options:
   -q, --queue QUEUE  Select queue (default name is 'default')
   -v, --version      Show this software revision
 EOF
-    exit 1
+  exit 1
 }
 
 version() {
-    echo "$PROGRAM $VERSION"
-    exit 0
+  echo "$PROGRAM $VERSION"
+  exit 0
 }
 
 queue=default
@@ -155,24 +157,24 @@ debug=
 
 parse_opt=run
 while [ $parse_opt != "done"  ] ; do
-    case "$1" in
-        -d|--daemon)  shift; daemon=yes;;
-        -q|--queue)   shift; queue="$1"; shift;;
-        -h|--help)    help;;
-        -v|--version) version;;
-        -x)           shift; debug="-x";;
+  case "$1" in
+    -d|--daemon)  shift; daemon=yes;;
+    -q|--queue)   shift; queue="$1"; shift;;
+    -h|--help)    help;;
+    -v|--version) version;;
+    -x)           shift; debug="-x";;
 
-        --) parse_opt=done;;
-        -*) echo "$PROGRAM: unknown option $1, try -h for help" >&2; exit 2;;
-         *) parse_opt=done;;
-    esac
+    --) parse_opt=done;;
+    -*) echo "$PROGRAM: unknown option $1, try -h for help" >&2; exit 2;;
+     *) parse_opt=done;;
+  esac
 done
 
 if [ -n "$daemon" ]; then
-    run_daemon
+  run_daemon
 fi
 if [ $# -gt 0 ]; then
-    add_job "$@"
+  add_job "$@"
 else
-    list_jobs
+  list_jobs
 fi

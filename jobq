@@ -32,10 +32,10 @@ list_jobs() {
   echo "ID     Submission date      Command"
   ls -1rt | \
   while read job; do
-    jobt=`stat -c%y $job 2>/dev/null | cut -d. -f1`
-    jobp=`sed 's/\\\([^\]\)/\1/g' $job 2>/dev/null`
+    jobt=$(stat -c%y $job 2>/dev/null | cut -d. -f1)
+    jobp=$(sed 's/\\\([^\]\)/\1/g' $job 2>/dev/null)
     if [ -n "$jobp" ]; then
-      printf "%5s %20s  %s" $job "$jobt" "$jobp"
+      printf "%-5s %20s  %s\n" $job "$jobt" "$jobp"
     fi
   done 
 }
@@ -172,6 +172,7 @@ done
 
 if [ -n "$daemon" ]; then
   run_daemon
+  exit 0
 fi
 if [ $# -gt 0 ]; then
   add_job "$@"

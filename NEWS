@@ -1,6 +1,8 @@
 jobq 0.7 (unreleased)
 
     * Changed indent from 4ws to 2ws (I'm too used to id)
+    * Fixed queue display while only requesting daemon start
+    * Fixed queue listing (`` => $() quoting hell)
 
 jobq 0.6
 

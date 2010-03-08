@@ -89,7 +89,7 @@ queue_runner() {
         if [ -z "$MAILTO" ]; then
           eval $cmd 2>&1
         else
-          eval $cmd 2>&1 | mailx -E -s "`hostame -f` job[$LOGNAME/$queue/$job]: $jobp" $MAILTO
+          eval $cmd 2>&1 | mailx -e -s "`hostame -f` job[$LOGNAME/$queue/$job]: $jobp" $MAILTO
         fi
         ret=$?
 

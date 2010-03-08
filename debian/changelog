@@ -1,3 +1,10 @@
+jobq (0.7.1) stable; urgency=low
+
+  * Bugfix for mail output, use mailx -e (and not newer -E which is not
+    supported in Lenny)
+
+ -- Vincent CARON <vcaron@bearstech.com>  Mon, 08 Mar 2010 18:33:36 +0100
+
 jobq (0.7) stable; urgency=low
 
   * Upstream update. 

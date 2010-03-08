@@ -1,3 +1,7 @@
+jobq 0.7.1
+
+    * Simple bugfix in mail output (was not workong), use 'mailx -e'
+
 jobq 0.7
 
     * Changed indent from 4ws to 2ws (I'm too used to id)

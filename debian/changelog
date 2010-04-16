@@ -1,3 +1,9 @@
+jobq (0.8) stable; urgency=low
+
+  * Upstream update. 
+
+ -- Vincent CARON <vcaron@bearstech.com>  Fri, 16 Apr 2010 17:25:31 +0200
+
 jobq (0.7.1) stable; urgency=low
 
   * Bugfix for mail output, use mailx -e (and not newer -E which is not

@@ -1,3 +1,7 @@
+jobq 0.8
+
+    * Added jobq-stat and jobq-profile scripts
+
 jobq 0.7.1
 
     * Simple bugfix in mail output (was not workong), use 'mailx -e'

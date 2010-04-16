@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+
+# Print a profile (number of calls andt total time) for every command
+# invoked by jobq. Needs to be fed with syslog'ed data via STDIN.
+#
+#   jobq-profile -q encoder < /var/log/user.log
+
+# Copyright (C) 2009,2010 Bearstech - http://bearstech.com/
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+my $program = 'jobq-stat';
+my $version = '0.8';
+
+my %job_by_id;
+my %jobtime;
+my %jobcall;
+
+my $queue = 'default';
+GetOptions('q|queue=s' => \$queue) or die "Usage: $0 [-q queue] < /var/log/user.log";
+
+my $ctx = $ENV{LOGNAME}."/$queue/";
+
+while (<STDIN>) {
+  if (/job\[$ctx(\d+)\]: start \(.*?\): (.*)/) {
+    $job_by_id{$1} = $2;
+    next;
+  }
+  if (/job\[$ctx(\d+)\]: done \(time:(\d+)/) {
+    my $cmd = $job_by_id{$1};
+    next if not defined $cmd;
+    $jobtime{$cmd} += $2,
+    $jobcall{$cmd}++;
+    next;
+  }
+}
+
+print  "Calls  Time(sec)  Command\n";
+printf("%5d  %9d  %s\n", $jobcall{$_}, $jobtime{$_}, $_) foreach sort { $jobtime{$b} - $jobtime{$a} } keys %jobtime;

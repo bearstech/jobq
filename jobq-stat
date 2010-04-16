@@ -1,0 +1,135 @@
+#!/bin/sh
+
+# Extract many statistics info from jobq syslog'ed data. For instance, one
+# can fire an automatic report after the usual log rotation with:
+#
+#   jobq-stat /var/log/user.log.0 | mail -s "jobq daily report" admin@foo.com
+#
+# ... or get the current picture from current log with:
+#
+#   jobq-stat /var/log/user.log
+
+# Copyright (C) 2009,2010 Bearstech - http://bearstech.com/
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+PROGRAM=jobq-stat
+VERSION=0.8
+
+# Hardcoded value for now, must be sync'ed with jobq's.
+JOBPATH=/tmp/jobq-$LOGNAME
+
+
+help() {
+  echo "Usage: $PROGRAM [-q <queue>] logfiles..."
+  exit 1
+}
+
+version() {
+  echo "$PROGRAM $VERSION"
+  exit 0
+}
+
+queue=default
+
+parse_opt=run
+while [ $parse_opt != "done"  ] ; do
+  case "$1" in
+    -q|--queue)   shift; queue="$1"; shift;;
+    -h|--help)    help;;
+    -v|--version) version;;
+
+    --) parse_opt=done;;
+    -*) echo "$PROGRAM: unknown option $1, try -h for help" >&2; exit 2;;
+     *) parse_opt=done;;
+  esac
+done
+logfiles="$*"
+if [ -z "$logfiles" ]; then
+  help
+fi
+
+cd $JOBPATH/$queue 2>/dev/null || { echo "No such job queue '$queue'" >&2; exit 1; }
+
+now=$(date +%s)
+older=$(ls -1rt | head -n1 | xargs stat -c%Y 2>/dev/null)
+queue_len=$(ls -1 | wc -l)
+
+n=0
+delay_sum=0
+delay_max=0
+todo_sum=0
+todo_max=0
+done_max=0
+zegrep " job\[$LOGNAME/$queue/[0-9]+\]: " $logfiles | {
+  while read l; do
+    _done=$(echo "$l" | sed -ne 's/.*: done (time:\([0-9]\+\) sec.*/\1/p')
+    if [ -n "$_done" ]; then
+      if [ $_done -gt $done_max ]; then
+        done_max="$_done"
+        done_max_job=$(echo "$lprev" | sed 's/.*[0-9]\+): //')
+      fi
+    else
+      delay=$(echo "$l" | sed 's/.*: start (delay://; s/ sec.*//')
+      todo=$(echo "$l" | sed 's/.*, todo://; s/).*//')
+      if [ $delay -gt $delay_max ]; then delay_max="$delay"; fi
+      if [ $todo -gt $todo_max ]; then todo_max="$todo"; fi
+      let delay_sum+=$delay
+      let todo_sum+=$todo
+    fi
+    let n++
+  
+    if [ -z "$log_begin" ]; then
+      log_begin=$(echo "$l" | awk '{print $1" "$2" "$3}')
+    fi
+    lprev="$l"
+  done
+  log_end=$(echo "$lprev" | awk '{print $1" "$2" "$3}')
+  
+  echo "Current job queue size  : $queue_len pending jobs"
+  if [ -n "$older" ]; then
+    queue_age=$(( ($now - $older + 59) / 60 ))
+    echo "Oldest queued job posted: $queue_age minute(s) ago"
+  fi
+ 
+  echo
+  if [ $n -gt 0 ]; then
+    delay_max_m=$(( ($delay_max + 59) / 60 ))
+    delay_avg_m=$(( ($delay_sum + 59) / (60 * $n) ))
+    todo_avg=$(( $todo_sum / $n ))
+    cat << EOF
+Job execution statistics from '$log_begin' to '$log_end'
+(extracted from $logfiles):
+
+  Total jobs launched   : $n
+  Average job queue size: $todo_avg
+  Maximum job queue size: $todo_max
+  Average job delay     : $delay_avg_m minute(s)
+  Maximum job delay     : $delay_max_m minute()s
+  Longest job exec time : $done_max second(s)
+  Longest job command   : $done_max_job
+EOF
+  else
+    echo "No past job found in $logfiles."
+  fi
+}
+
+echo
+zcat -f $logfiles | jobq-profile -q "$queue"
+
+if [ $queue_len -gt 0 ]; then
+  echo
+  echo "Pending jobs:"
+  jobq -q "$queue" | sed 's/^/  /'
+fi

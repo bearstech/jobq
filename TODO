@@ -2,3 +2,6 @@
 * Queue runner list/stop
 * Interrupt idle 'sleep 5' to chain jobs immediatly
 * Man page (--help gets bulky, and DFSG requires it)
+
+Long term:
+* Full Perl rewrite: many operations are awkard, slow and costly with shell

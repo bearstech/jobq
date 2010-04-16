@@ -17,7 +17,9 @@ install: build
 				dh_clean -k 
 				dh_installdirs
 
-				install -o root -g root -m 755 $(CURDIR)/jobq $(CURDIR)/debian/jobq/usr/bin/jobq
+				install -o root -g root -m 755 $(CURDIR)/jobq         $(CURDIR)/debian/jobq/usr/bin/jobq
+				install -o root -g root -m 755 $(CURDIR)/jobq-profile $(CURDIR)/debian/jobq/usr/bin/jobq-profile
+				install -o root -g root -m 755 $(CURDIR)/jobq-stat    $(CURDIR)/debian/jobq/usr/bin/jobq-stat
 
 binary: build install
 				dh_testdir

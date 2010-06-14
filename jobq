@@ -21,7 +21,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGRAM=jobq
-VERSION=0.8
+VERSION=0.8.1
 
 # Hardcoded value for now, should fit most people
 JOBPATH=/tmp/$PROGRAM-$LOGNAME
@@ -57,10 +57,12 @@ add_job() {
   echo "$argv" >.$id && mv .$id $id
   
   # Automatically start queue runner
-  cd - >/dev/null && exec $0 -q $queue -d $debug
+  cd - >/dev/null && run_daemon
 }
 
 queue_runner() {
+  cd $JOBPATH/$queue
+
   if [ -z "$debug" ]; then
     trap ":" INT HUP
     exec </dev/null 2>/dev/null >/dev/null
@@ -104,23 +106,19 @@ queue_runner() {
 }
 
 run_daemon() {
-  cd $JOBPATH/$queue
+  pidfile=$JOBPATH/$queue/.runner
+  jobqpath="$(cd "$(dirname "$0")"; pwd)/$(basename $0)"
 
-  pidfile=.runner
-  pid=`cat $pidfile 2>/dev/null`
-  if kill -0 "$pid" 2>/dev/null; then
-    # OK, queue runner is alive for this queue
-    exit 0
+  mkdir -m 0700 -p $JOBPATH/$queue
+
+  /sbin/start-stop-daemon --quiet --make-pidfile --pidfile $pidfile --startas $jobqpath --background --start -- -q $queue -s $debug
+  if [ $? -eq 1 ]; then
+    if [ -n "$daemon" ]; then 
+      echo 'Jobq is already running !'
+    fi
+  else
+    echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $pid)" | logger -t $PROGRAM
   fi
-  # No queue runner at all or some dead pid, cleanup
-  rm -f $pidfile
-
-  export debug queue pidfile
-  queue_runner &
-
-  pid=$!
-  echo $pid > $pidfile
-  echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $pid)" | logger -t $PROGRAM
 }
 
 help() {
@@ -159,6 +157,7 @@ parse_opt=run
 while [ $parse_opt != "done"  ] ; do
   case "$1" in
     -d|--daemon)  shift; daemon=yes;;
+    -s)           shift; startqueue=yes;; # internal usage only
     -q|--queue)   shift; queue="$1"; shift;;
     -h|--help)    help;;
     -v|--version) version;;
@@ -170,6 +169,10 @@ while [ $parse_opt != "done"  ] ; do
   esac
 done
 
+if [ -n "$startqueue" ]; then
+  queue_runner
+  exit 0
+fi
 if [ -n "$daemon" ]; then
   run_daemon
   exit 0

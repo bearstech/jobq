@@ -13,6 +13,10 @@ Homepage, more documentation and updates:
 
   http://forge.bearstech.com/trac/wiki/JobQueue
 
+Note: as of version 0.8.1, jobq depends on start-stop-daemon (from Debian).
+On other distributions than Debian, either install that tool or hack jobq's
+run_daemon method.
+
 Example usage:
 
   Run two heavy jobs, first is run immediatly since queue

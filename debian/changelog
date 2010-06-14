@@ -1,3 +1,9 @@
+jobq (0.8.1) stable; urgency=low
+
+  * Use start-stop-daemon instead of custom deamonization method 
+
+ -- Sebastien Bocahu <sbocahu@bearstech.com>  Thu, 10 Jun 2010 20:32:18 +0200
+
 jobq (0.8) stable; urgency=low
 
   * Upstream update. 

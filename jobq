@@ -56,17 +56,15 @@ add_job() {
   id=$$
   echo "$argv" >.$id && mv .$id $id
   
-  # Automatically start queue runner
-  cd - >/dev/null && run_daemon
+  # Automatically start queue runner in backgorund. Make sure to restore
+  # caller's cwd so referring to $0 still works.
+  cd - >/dev/null && queue_runner_daemon
 }
 
 queue_runner() {
-  cd $JOBPATH/$queue
+  echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $$)" | logger -t $PROGRAM
 
-  if [ -z "$debug" ]; then
-    trap ":" INT HUP
-    exec </dev/null 2>/dev/null >/dev/null
-  fi
+  cd $JOBPATH/$queue
 
   while true; do
     # Fetch job list in time order, older is first
@@ -105,19 +103,25 @@ queue_runner() {
   done
 }
 
-run_daemon() {
-  pidfile=$JOBPATH/$queue/.runner
-  jobqpath="$(cd "$(dirname "$0")"; pwd)/$(basename $0)"
-
+queue_runner_daemon() {
+  # Make sure the queue path exists so we can write our pidfile
   mkdir -m 0700 -p $JOBPATH/$queue
+  pidfile=$JOBPATH/$queue/.runner
 
-  /sbin/start-stop-daemon --quiet --make-pidfile --pidfile $pidfile --startas $jobqpath --background --start -- -q $queue -s $debug
-  if [ $? -eq 1 ]; then
-    if [ -n "$daemon" ]; then 
-      echo 'Jobq is already running !'
-    fi
-  else
-    echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $pid)" | logger -t $PROGRAM
+  # - s-s-d does the pidfile mess and hopefully proper locking for us
+  # - --chdir PWD is needed to invoke $0 because s-s-d chdir to / as a default
+  /sbin/start-stop-daemon --quiet \
+    --make-pidfile --pidfile $pidfile \
+    --chdir "$PWD" \
+    --background --start --startas "$0" -- \
+    --runner --queue "$queue"
+  if [ $? = 1 ]; then
+    # Daemon is already up, wake it up to process new job immediatly
+    #kill -USR1 $(cat "$pidfile")  FIXME: to implement, interrupt sleep 5 above with signal
+    true
+  fi
+  if [ $? != 0 ]; then
+    echo "Error while trying to start queue runner for user/queue '$LOGNAME/$queue'" >&2
   fi
 }
 
@@ -136,9 +140,9 @@ either parsed by explicit queue runner start, either while running the first
 job for a given user/queue.
 
 Options:
-  -d, --daemon       Explicitly start queue runner daemon
   -h, --help         Show this help
   -q, --queue QUEUE  Select queue (default name is 'default')
+  -r, --runner       Explicitly start queue runner (in foreground)
   -v, --version      Show this software revision
 EOF
   exit 1
@@ -150,18 +154,15 @@ version() {
 }
 
 queue=default
-daemon=
-debug=
+runner=
 
 parse_opt=run
 while [ $parse_opt != "done"  ] ; do
   case "$1" in
-    -d|--daemon)  shift; daemon=yes;;
-    -s)           shift; startqueue=yes;; # internal usage only
     -q|--queue)   shift; queue="$1"; shift;;
+    -r|--runner)  shift; runner=yes;;
     -h|--help)    help;;
     -v|--version) version;;
-    -x)           shift; debug="-x";;
 
     --) parse_opt=done;;
     -*) echo "$PROGRAM: unknown option $1, try -h for help" >&2; exit 2;;
@@ -169,12 +170,8 @@ while [ $parse_opt != "done"  ] ; do
   esac
 done
 
-if [ -n "$startqueue" ]; then
+if [ -n "$runner" ]; then
   queue_runner
-  exit 0
-fi
-if [ -n "$daemon" ]; then
-  run_daemon
   exit 0
 fi
 if [ $# -gt 0 ]; then

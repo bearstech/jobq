@@ -116,9 +116,11 @@ queue_runner_daemon() {
     --background --start --startas "$0" -- \
     --runner --queue "$queue"
   if [ $? = 1 ]; then
-    # Daemon is already up, wake it up to process new job immediatly
-    #kill -USR1 $(cat "$pidfile")  FIXME: to implement, interrupt sleep 5 above with signal
-    true
+    # Daemon is already running, wake it up to process new job immediatly
+    sleeppid=$(ps -o pid,cmd --ppid $(cat "$pidfile") --noheadings | awk '/sleep/{ print $1 }')
+    if [ -z "$sleeppid" ]; then
+      kill -USR1 "$sleeppid"
+    fi
   fi
   if [ $? != 0 ]; then
     echo "Error while trying to start queue runner for user/queue '$LOGNAME/$queue'" >&2

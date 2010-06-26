@@ -98,8 +98,8 @@ queue_runner() {
         echo "done (time:$dt sec, exit:$ret)"
       ) | logger -t "job[$LOGNAME/$queue/$job]"
     else
-      # No job, re-scan the queue later
-      sleep 25 & wait $!
+      # No job, re-scan the queue later: wait 60sec or USR1
+      sleep 60 & wait $!
       kill $!
     fi
   done
@@ -137,7 +137,7 @@ needed per queue and per user, and is started automatically upon first job
 submission. There is no mechanism to stop a queue runner besides killing it.
 
 If MAILTO is set, job output (if any) is sent to this address, otherwise it
-is syslogged to the user.info facility. This is a queue runner setting,
+is syslogged to the user.notice facility. This is a queue runner setting,
 either parsed by explicit queue runner start, either while running the first
 job for a given user/queue.
 

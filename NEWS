@@ -1,3 +1,10 @@
+jobq 0.8.1
+
+    * Use start-stop-daemon instead of custom deamonization method,
+      fixes queue runner daemon startip race conditions (S. Bocahu)
+
+    * Wake up queue runner as soon as a new job is queued (S. Bocahu)
+
 jobq 0.8
 
     * Added jobq-stat and jobq-profile scripts

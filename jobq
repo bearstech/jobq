@@ -62,6 +62,7 @@ add_job() {
 }
 
 queue_runner() {
+  trap ":" USR1
   echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $$)" | logger -t $PROGRAM
 
   cd $JOBPATH/$queue
@@ -98,12 +99,14 @@ queue_runner() {
       ) | logger -t "job[$LOGNAME/$queue/$job]"
     else
       # No job, re-scan the queue later
-      sleep 5
+      sleep 25 & wait $!
+      kill $!
     fi
   done
 }
 
 queue_runner_daemon() {
+  set +e
   # Make sure the queue path exists so we can write our pidfile
   mkdir -m 0700 -p $JOBPATH/$queue
   pidfile=$JOBPATH/$queue/.runner
@@ -117,10 +120,7 @@ queue_runner_daemon() {
     --runner --queue "$queue"
   if [ $? = 1 ]; then
     # Daemon is already running, wake it up to process new job immediatly
-    sleeppid=$(ps -o pid,cmd --ppid $(cat "$pidfile") --noheadings | awk '/sleep/{ print $1 }')
-    if [ -z "$sleeppid" ]; then
-      kill -USR1 "$sleeppid"
-    fi
+    kill -USR1 $(cat "$pidfile")
   fi
   if [ $? != 0 ]; then
     echo "Error while trying to start queue runner for user/queue '$LOGNAME/$queue'" >&2

@@ -25,31 +25,64 @@ use strict;
 use warnings;
 use Getopt::Long;
 
-my $program = 'jobq-stat';
-my $version = '0.8.1';
+my $program = 'jobq-profile';
+my $version = '0.8.2';
 
 my %job_by_id;
 my %jobtime;
 my %jobcall;
 
-my $queue = 'default';
-GetOptions('q|queue=s' => \$queue) or die "Usage: $0 [-q queue] < /var/log/user.log";
+sub usage {
+    print STDERR <<EOF;
+Usage: $0 [-u user] [-q queue] [/var/log/user.log] [...]
 
-my $ctx = $ENV{LOGNAME}."/$queue/";
+Show number of calls and cumulated (wall clock) time for every job
+run via jobq, sorted by cumulated time.
 
-while (<STDIN>) {
-  if (/job\[$ctx(\d+)\]: start \(.*?\): (.*)/) {
-    $job_by_id{$1} = $2;
-    next;
-  }
-  if (/job\[$ctx(\d+)\]: done \(time:(\d+)/) {
-    my $cmd = $job_by_id{$1};
-    next if not defined $cmd;
-    $jobtime{$cmd} += $2,
-    $jobcall{$cmd}++;
-    next;
-  }
+Since jobq sends statistics to the 'user' syslog facility, jobq-profile
+defaults to parsing 'user.log'. The default user is the current user
+(\$LOGNAME). The default queue is 'default'.
+
+EOF
+    exit 1;
 }
 
-print  "Calls  Time(sec)  Command\n";
-printf("%5d  %9d  %s\n", $jobcall{$_}, $jobtime{$_}, $_) foreach sort { $jobtime{$b} - $jobtime{$a} } keys %jobtime;
+my $queue = 'default';
+my $user  = $ENV{LOGNAME};
+usage() if not GetOptions(
+    'u|user=s'  => \$user,
+    'q|queue=s' => \$queue
+);
+
+my @logfiles = @ARGV;
+@logfiles = ('/var/log/user.log') if not @logfiles;
+
+my $ctx = "$user/$queue/";
+
+while (@logfiles) {
+    my $logfile = shift @logfiles;
+    open(my $log, '-|', 'zcat', '-f', $logfile) or warn "$logfile: $!";
+
+    while (<$log>) {
+        if (/job\[$ctx(\d+)\]: start \(.*?\): (.*)/) {
+            $job_by_id{$1} = $2;
+            next;
+        }
+        if (/job\[$ctx(\d+)\]: done \(time:(\d+)/) {
+            my $cmd = $job_by_id{$1};
+            next if not defined $cmd;
+            $jobtime{$cmd} += $2,
+            $jobcall{$cmd}++;
+            next;
+        }
+    }
+
+    close($log) if $log;
+}
+
+if (not keys %jobtime) {
+    print "No jobq event found for user '$user' and queue '$queue'\n";
+    exit;
+}
+print  "Calls Time(sec) Command\n";
+printf("%5d%9d  %s\n", $jobcall{$_}, $jobtime{$_}, $_) foreach sort { $jobtime{$b} - $jobtime{$a} } keys %jobtime;

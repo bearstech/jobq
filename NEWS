@@ -1,3 +1,12 @@
+jobq 0.8.2
+
+    * jobq-stat would parse any logged stdout job output
+    * jobq-{stat,profile} has a better --help
+    * jobq-{stat,profile} accepts -u user option
+    * jobq-{stat,profile} defaults to parsing /var/log/user.log
+    * jobq-profile nows accepts a list of logfiles like jobq-stat
+    * jobq-profile is now helpful when no data is found
+
 jobq 0.8.1
 
     * Use start-stop-daemon instead of custom deamonization method,

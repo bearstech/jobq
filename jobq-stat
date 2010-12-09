@@ -3,7 +3,7 @@
 # Extract many statistics info from jobq syslog'ed data. For instance, one
 # can fire an automatic report after the usual log rotation with:
 #
-#   jobq-stat /var/log/user.log.0 | mail -s "jobq daily report" admin@foo.com
+#   jobq-stat /var/log/user.log.1 | mail -s "jobq daily report" admin@foo.com
 #
 # ... or get the current picture from current log with:
 #
@@ -25,14 +25,21 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGRAM=jobq-stat
-VERSION=0.8.1
-
-# Hardcoded value for now, must be sync'ed with jobq's.
-JOBPATH=/tmp/jobq-$LOGNAME
+VERSION=0.8.2
 
 
 help() {
-  echo "Usage: $PROGRAM [-q <queue>] logfiles..."
+  cat <<EOF >&2
+Usage: $PROGRAM [-u user] [-q <queue>] [/var/log/user.log] [...]
+
+Show statistics for the given job queue: number of pending jobs,
+run jobs, delays, etc.
+
+Since jobq sends statistics to the 'user' syslog facility, jobq-stat
+defaults to parsing 'user.log'. The default user is the current user
+(\$LOGNAME). The default queue is 'default'.
+
+EOF
   exit 1
 }
 
@@ -41,11 +48,13 @@ version() {
   exit 0
 }
 
+user="$LOGNAME"
 queue=default
 
 parse_opt=run
 while [ $parse_opt != "done"  ] ; do
   case "$1" in
+    -u|--user)    shift; user="$1"; shift;;
     -q|--queue)   shift; queue="$1"; shift;;
     -h|--help)    help;;
     -v|--version) version;;
@@ -57,10 +66,12 @@ while [ $parse_opt != "done"  ] ; do
 done
 logfiles="$*"
 if [ -z "$logfiles" ]; then
-  help
+  logfiles=/var/log/user.log
 fi
 
-cd $JOBPATH/$queue 2>/dev/null || { echo "No such job queue '$queue'" >&2; exit 1; }
+# Hardcoded value for now, must be sync'ed with jobq's.
+JOBPATH=/tmp/jobq-$user
+cd $JOBPATH/$queue 2>/dev/null || { echo "No such job queue '$queue' for user '$user'" >&2; exit 1; }
 
 now=$(date +%s)
 older=$(ls -1rt | head -n1 | xargs stat -c%Y 2>/dev/null)
@@ -72,7 +83,7 @@ delay_max=0
 todo_sum=0
 todo_max=0
 done_max=0
-zegrep " job\[$LOGNAME/$queue/[0-9]+\]: " $logfiles | {
+zegrep " job\[$user/$queue/[0-9]+\]: (start|stop) " $logfiles | {
   while read l; do
     _done=$(echo "$l" | sed -ne 's/.*: done (time:\([0-9]\+\) sec.*/\1/p')
     if [ -n "$_done" ]; then
@@ -126,7 +137,7 @@ EOF
 }
 
 echo
-zcat -f $logfiles | jobq-profile -q "$queue"
+jobq-profile -u "$user" -q "$queue" $logfiles 
 
 if [ $queue_len -gt 0 ]; then
   echo

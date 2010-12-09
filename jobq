@@ -21,10 +21,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGRAM=jobq
-VERSION=0.8.1
+VERSION=0.8.2
 
 # Hardcoded value for now, should fit most people
-JOBPATH=/tmp/$PROGRAM-$LOGNAME
+JOBPATH=/tmp/jobq-$LOGNAME
 
 
 list_jobs() {
@@ -42,6 +42,7 @@ list_jobs() {
 
 add_job() {
   set -e
+  # Make sure the queue path exists so we can write our job file
   mkdir -m 0700 -p $JOBPATH/$queue
   cd $JOBPATH/$queue
 
@@ -114,13 +115,14 @@ queue_runner_daemon() {
   # - s-s-d does the pidfile mess and hopefully proper locking for us
   # - --chdir PWD is needed to invoke $0 because s-s-d chdir to / as a default
   /sbin/start-stop-daemon --quiet \
-    --make-pidfile --pidfile $pidfile \
+    --start --startas "$0" \
     --chdir "$PWD" \
-    --background --start --startas "$0" -- \
-    --runner --queue "$queue"
+    --background \
+    --make-pidfile --pidfile $pidfile \
+    -- --runner --queue "$queue"
   if [ $? = 1 ]; then
-    # Daemon is already running, wake it up to process new job immediatly
-    kill -USR1 $(cat "$pidfile")
+    # Daemon is already running, wake it up (send USR1) to process new job immediatly
+    /sbin/start-stop-daemon --quiet --stop --signal USR1 --pidfile $pidfile
   fi
   if [ $? != 0 ]; then
     echo "Error while trying to start queue runner for user/queue '$LOGNAME/$queue'" >&2

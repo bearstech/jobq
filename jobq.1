@@ -1,0 +1,112 @@
+.\" Yes, this file is manually edited.
+.\"
+.TH "JOBQ" "1" "09/12/2010" "\  0.8.2" "\ "
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+jobq \- simple job queue (a better batch)
+.SH "SYNOPSIS"
+jobq [options]
+jobq [options] command args ...
+.sp
+.SH "DESCRIPTION"
+Jobq manages a simple batch queue, where one job is run after the other. Many queues can be run independently, and no specific privileges or daemon is required. Queue info and statistics are syslogged.
+.sp
+It is especially useful for complex crontabs, to force sequential execution of jobs that would otherwise run in parallel with unlimited instances. Jobs and load can be regulated by 'run queues' very easily with jobq.
+.sp
+The default queue is called 'default'. One 'queue runner' daemon is needed per queue and per user, and is started automatically upon first job submission. This queue runner will then run forever in background and monitor the queue.
+.sp
+If MAILTO is set, job output (if any) is sent to this address (this makes it transparent when used via a crontab for instance). Otherwise it is syslogged to the user.notice facility. This is a per-queue setting, either parsed by explicit queue runner start, either while running the first job for a given queue.
+.sp
+Statistics are sent to the user.notice syslog facility and may be used by jobq-stat(1) and jobq-profile(1).
+.sp
+.SH "OPTIONS"
+.TP
+\-h, \-\-help
+Display a short options summary.
+.TP
+\-q, \-\-queue QUEUE
+Select queue (default name is 'default').
+.TP
+\-r, \-\-runner
+Explicitly start queue runner (in foreground). If you don't know what it means, you don' need it. It's mostly used for debug and development.
+.TP
+\-v, \-\-version
+Display version number and copyright information.
+.SH "EXAMPLES"
+Queue a job wich tarballs your /etc to the default queue, it will be run as soon as the queue is free.
+.sp
+.sp
+.nf
+$ jobq tar czf /tmp/etc.tar.gz /etc
+.fi
+.sp
+.sp
+List queued jobs on queue 'compile' :
+.sp
+.sp
+.nf
+$ jobq -q compile
+ID     Submission date      Command
+10447  2009-10-27 16:06:59  make -C /usr/src/linux bzimage
+11842  2009-10-27 16:14:20  make -C /usr/src/ffmpeg
+.fi
+.SH "INTERPRETATION"
+FIXME
+.sp
+.SH "DISCUSSION"
+Jobq is a sysadmin hack and was built on sysadmin tools. Locking is managed by start-stop-daemon(8) at the process level and the (hopefully atomic) mv(1) at the filesystem level.
+.sp
+A job is simple file '/tmp/jobq-USER/NAME/ID' where USER is the currently logged in user, NAME the queue name, and ID the actual pid of the jobq process adding a job. The content of this file is a quoted version of the submitted command and its arguments.
+.sp
+It is fairly easy to hack directly this pseudo database, and it's also rarely needed. Mostly you'll want to reset a queue with a 'rm -rf' on its folder (a mv(1) then 'rm -rf' would be actually better).
+.sp
+It naturally inherits from the Unix security model; queue folders are created with exclusive access to their owner. It does not scale well, at least not more than your filesystem wrt. inodes per folder. On the other hand, it is not meant to scale, it was designed to be regulated as to have the smallest possible queue in any event.
+.sp
+.SH "BUGS"
+Jobq started as a quite simple shell hack, it's now reaching the limits of acceptable bashisms and ugliness.
+.sp
+It uses subshells and pipes wich tends to show a bunches of process per job (two queue runner copies, a logger, a mailer).
+.sp
+There is no mechanism to stop a queue runner besides killing it.
+.sp
+There is no mechanism to edit jobs (modify, remove, reschedule) besides tweaking the files in /tmp/jobq-*.
+.sp
+Please file bugs on http://forge.bearstech.com/trac/newticket (simple registration needed).
+.sp
+.SH "ENVIRONMENT VARIABLES"
+.sp
+.TP
+MAILTO
+If defined, any output from a job is sent to this command. Useful to keep the original crond behaviour
+when using a crontab to submit job to a queue.
+.sp
+.TP
+LOGNAME
+A queue is defined by a user (LOGNAME) and a name. jobq-stat and jobq-profile let you query any user with the
+-u option. You might cheat jobq with 'LOGNAME=other jobq some command' but don't do that, it will only confuse
+others or even yourself.
+.sp
+.SH "FILES"
+.sp
+.nf
+/tmp/jobq-USER/NAME
+The queue itself is a simple folder, where each job is a file.
+.fi
+.SH "AUTHOR"
+Written by Vincent Caron
+.sp
+Homepage at \fIhttp://forge.bearstech.com/trac/wiki/JobQueue\fR
+.sp
+.SH "COPYRIGHT"
+.sp
+Copyright © 2009,2010 Bearstech. License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
+.sp
+.SH "SEE ALSO"
+.sp
+.nf
+batch(1), logger(2)
+.fi

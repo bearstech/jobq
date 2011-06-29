@@ -9,11 +9,14 @@ release:
 	  rm -rf $$release )
 
 deb:
-	dpkg-buildpackage -rfakeroot -uc -us
+	@echo "Don't forget to edit debian/changelog (dch -v <version>)..."
+	@echo "Building the package..."
+	dpkg-buildpackage -rfakeroot -i -I.svn -I'*.log'
 
 debclean:
-	fakeroot debian/rules clean && rm build
+	fakeroot debian/rules clean
+	rm build
 
 debupload:
 	rsync -z ../jobq_*.deb builder@deb:~/src/jobq/
-	ssh builder@deb make -C www jobq
+	ssh builder@deb make -C www/squeeze jobq

@@ -1,3 +1,9 @@
+jobq (0.8.3) stable; urgency=low
+
+  * Changed shell to explicit bash, 'print %q' is a bashism 
+
+ -- Vincent CARON <vcaron@bearstech.com>  Mon, 26 Aug 2013 18:29:43 +0200
+
 jobq (0.8.2) stable; urgency=low
 
   * Upstream update 

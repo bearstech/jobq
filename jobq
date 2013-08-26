@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Simple job queue, run one process at once per queue and log timings and delays.
 #

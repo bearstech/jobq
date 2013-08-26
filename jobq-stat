@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Extract many statistics info from jobq syslog'ed data. For instance, one
 # can fire an automatic report after the usual log rotation with:

@@ -1,3 +1,12 @@
+jobq (0.9.0) stable; urgency=low
+
+  * rewrote queue runner locking code (a race condition still existed),
+    ditched start-stop-daemon
+  * now explicitly re-execing itself with --job internal arg
+  * added --debug mode
+
+ -- Vincent CARON <vcaron@bearstech.com>  Thu, 10 Nov 2016 16:54:54 +0100
+
 jobq (0.8.3) stable; urgency=low
 
   * Changed shell to explicit bash, 'print %q' is a bashism 

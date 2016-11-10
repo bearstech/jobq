@@ -26,7 +26,7 @@ use warnings;
 use Getopt::Long;
 
 my $program = 'jobq-profile';
-my $version = '0.8.2';
+my $version = '0.9.0';
 
 my %job_by_id;
 my %jobtime;

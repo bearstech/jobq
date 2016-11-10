@@ -21,13 +21,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGRAM=jobq
-VERSION=0.8.2
+VERSION=0.9.0
 
 # Hardcoded value for now, should fit most people
 JOBPATH=/tmp/jobq-$LOGNAME
 
 
-list_jobs() {
+job_list() {
   cd $JOBPATH/$queue 2>/dev/null || exit 0
   echo "ID     Submission date      Command"
   ls -1rt | \
@@ -40,10 +40,12 @@ list_jobs() {
   done 
 }
 
-add_job() {
+job_add() {
   set -e
+
   # Make sure the queue path exists so we can write our job file
-  mkdir -m 0700 -p $JOBPATH/$queue
+  mkdir -p -m 0700 $JOBPATH
+  mkdir -p -m 0700 $JOBPATH/$queue
   cd $JOBPATH/$queue
 
   # Command line args re-quote - you don't want to know this shell ugliness.
@@ -57,76 +59,80 @@ add_job() {
   id=$$
   echo "$argv" >.$id && mv .$id $id
   
-  # Automatically start queue runner in backgorund. Make sure to restore
-  # caller's cwd so referring to $0 still works.
-  cd - >/dev/null && queue_runner_daemon
+  # Automatically try to start the queue runner in background. Make sure to
+  # restore caller's cwd so referring to $0 still works.
+  cd - >/dev/null
+  exec "$0" --queue "$queue" --runner
 }
 
 queue_runner() {
-  trap ":" USR1
-  echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $$)" | logger -t $PROGRAM
+  if [ "$debug" = yes ]; then
+    set -x
+    exec 2>/tmp/jobq-debug.$BASHPID
+  fi
 
-  cd $JOBPATH/$queue
+  mkdir -p -m 0700 $JOBPATH
+  mkdir -p -m 0700 $JOBPATH/$queue
+  cd $JOBPATH/$queue || exit 1
+
+  # The pidfile is also a lockfile, making sure there's a single runner per queue
+  pid=$BASHPID  # And _not_ $$ because we're in a subshell (backgrounded)
+  if !(set -o noclobber; echo $pid >.runner) 2>/dev/null; then
+    runner=`cat .runner 2>/dev/null`
+    if [ "$debug" = yes ]; then
+      echo "waking up runner for user/queue '$LOGNAME/$queue' (pid $runner)" | logger -t $PROGRAM
+    fi
+    kill -USR1 $runner 2>/dev/null && exit
+
+    rm -f .runner
+    echo "stale pidfile, removing $PWD/.runner and spawning a new one (unsafe)" | logger -t $PROGRAM
+    # Incur a delay which varies wildly when PIDs are close, hopefully minimizing the race condition
+    eval "sleep .$(($$ * $$))"
+    exec "$0" --queue "$queue" --runner
+  fi
+
+  trap "rm -f $PWD/.runner; exit" INT TERM EXIT
+  trap ":" USR1
+  echo "queue runner started for user/queue '$LOGNAME/$queue' (pid $pid)" | logger -t $PROGRAM
 
   while true; do
-    # Fetch job list in time order, older is first
-    jobl=`ls -1rt 2>/dev/null`
-    job=`echo "$jobl" | head -n1`
+    # Fetch job list in time order, pick older
+    job=`ls -1rt 2>/dev/null | head -n1`
 
     if [ -n "$job" ]; then
-      cmd=`cat $job`              # content of job file, the command to run
-      job=`basename "$job"`       # job ID
-      jobt=`stat -c%Y $job`       # job submission time
-      rm $job                     # remove the job, it _will_ be run in a few lines
-      todo=`echo "$jobl" |wc -l`  # new job queue size
-
-      # Run job in a subshell, capture stdin+stderr, send to syslog
-      export cmd jobt todo
-      (
-        t0=`date +%s`
-        late=$(( $t0 - $jobt ))
-        jobp=$(echo "$cmd" | sed 's/\\\([^\]\)/\1/g')
-        echo "start (delay:$late sec, todo:$todo): $jobp"
-
-        if [ -z "$MAILTO" ]; then
-          eval $cmd 2>&1
-        else
-          eval $cmd 2>&1 | mailx -e -s "`hostame -f` job[$LOGNAME/$queue/$job]: $jobp" $MAILTO
-        fi
-        ret=$?
-
-        dt=$(( `date +%s` - $t0 ))
-        echo "done (time:$dt sec, exit:$ret)"
-      ) | logger -t "job[$LOGNAME/$queue/$job]"
+      "$0" --queue "$queue" --job "$job" 2>&1 | logger -t "job[$LOGNAME/$queue/$job]"
     else
       # No job, re-scan the queue later: wait 60sec or USR1
-      sleep 60 & wait $!
-      kill $!
+      sleep 60 &  # 'sleep' cannot be interrupted by USR1, thus it goes into the background
+      wait $!     # 'wait' _can_ be interrupted by USR1
+      kill $! 2>/dev/null  # Kill 'sleep' if still running
     fi
   done
 }
 
-queue_runner_daemon() {
-  set +e
-  # Make sure the queue path exists so we can write our pidfile
-  mkdir -m 0700 -p $JOBPATH/$queue
-  pidfile=$JOBPATH/$queue/.runner
+job_runner() {
+  cd $JOBPATH/$queue || exit 1
 
-  # - s-s-d does the pidfile mess and hopefully proper locking for us
-  # - --chdir PWD is needed to invoke $0 because s-s-d chdir to / as a default
-  /sbin/start-stop-daemon --quiet \
-    --start --startas "$0" \
-    --chdir "$PWD" \
-    --background \
-    --make-pidfile --pidfile $pidfile \
-    -- --runner --queue "$queue"
-  if [ $? = 1 ]; then
-    # Daemon is already running, wake it up (send USR1) to process new job immediatly
-    /sbin/start-stop-daemon --quiet --stop --signal USR1 --pidfile $pidfile
+  cmd=`cat $job`              # content of job file, the command to run
+  jobt=`stat -c%Y $job`       # job submission time
+  rm $job                     # remove the job, it _will_ be run in a few lines
+
+  # Statistics
+  todo=`ls |wc -l`
+  t0=`date +%s`
+  late=$(( $t0 - $jobt ))
+  jobp=$(echo "$cmd" | sed 's/\\\([^\]\)/\1/g')
+  echo "start (delay:$late sec, todo:$todo): $jobp"
+
+  if [ -n "$MAILTO" ]; then
+    eval $cmd | mailx -e -s "`hostame -f` job[$LOGNAME/$queue/$job]: $jobp" $MAILTO
+  else
+    eval $cmd
   fi
-  if [ $? != 0 ]; then
-    echo "Error while trying to start queue runner for user/queue '$LOGNAME/$queue'" >&2
-  fi
+  ret=$?
+
+  dt=$(( `date +%s` - $t0 ))
+  echo "done (time:$dt sec, exit:$ret)"
 }
 
 help() {
@@ -159,13 +165,17 @@ version() {
 
 queue=default
 runner=
+job=
+debug=no
 
 parse_opt=run
 while [ $parse_opt != "done"  ] ; do
   case "$1" in
+    -d|--debug)   shift; debug=yes;;
+    -h|--help)    help;;
+    -j|--job)     shift; job="$1"; shift;;  # Internal option
     -q|--queue)   shift; queue="$1"; shift;;
     -r|--runner)  shift; runner=yes;;
-    -h|--help)    help;;
     -v|--version) version;;
 
     --) parse_opt=done;;
@@ -175,11 +185,15 @@ while [ $parse_opt != "done"  ] ; do
 done
 
 if [ -n "$runner" ]; then
-  queue_runner
+  queue_runner </dev/null >/dev/null 2>/dev/null &
+  exit 0
+fi
+if [ -n "$job" ]; then
+  job_runner
   exit 0
 fi
 if [ $# -gt 0 ]; then
-  add_job "$@"
+  job_add "$@"
 else
-  list_jobs
+  job_list
 fi

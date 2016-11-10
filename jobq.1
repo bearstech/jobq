@@ -1,6 +1,6 @@
 .\" Yes, this file is manually edited.
 .\"
-.TH "JOBQ" "1" "09/12/2010" "\  0.8.2" "\ "
+.TH "JOBQ" "1" "09/12/2010" "\  0.9.0" "\ "
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
@@ -57,7 +57,7 @@ ID     Submission date      Command
 FIXME
 .sp
 .SH "DISCUSSION"
-Jobq is a sysadmin hack and was built on sysadmin tools. Locking is managed by start-stop-daemon(8) at the process level and the (hopefully atomic) mv(1) at the filesystem level.
+Jobq is a sysadmin hack and was built with bare requirements (bash and coreutils).
 .sp
 A job is simple file '/tmp/jobq-USER/NAME/ID' where USER is the currently logged in user, NAME the queue name, and ID the actual pid of the jobq process adding a job. The content of this file is a quoted version of the submitted command and its arguments.
 .sp

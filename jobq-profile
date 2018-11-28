@@ -48,7 +48,7 @@ EOF
 }
 
 my $queue = 'default';
-my $user  = $ENV{LOGNAME};
+my $user  = getpwuid($<);
 usage() if not GetOptions(
     'u|user=s'  => \$user,
     'q|queue=s' => \$queue
